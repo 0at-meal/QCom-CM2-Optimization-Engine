@@ -6,7 +6,6 @@ import plotly.graph_objects as go
 import sys
 import os
 
-# Add src to path to allow imports
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.join(current_dir, '..')
 sys.path.append(parent_dir)
@@ -24,7 +23,7 @@ def load_engine():
 @st.cache_data
 def run_evaluation_cached():
     df = load_data(os.path.join(parent_dir, 'data', 'qcom_pune_dataset.csv'))
-    # Sample 500 for speed in dashboard
+
     test_df = df.sample(500, random_state=42)
     engine = load_engine()
     
@@ -35,7 +34,6 @@ def run_evaluation_cached():
         try:
             opt = engine.optimize_fee(req)
             
-            # Historic Calc
             actual_fee = row['delivery_fee_charged']
             hist_features = engine._prepare_features(req, [actual_fee])
             hist_prob = engine.model.predict_proba(hist_features)[:, 1][0]
@@ -61,10 +59,8 @@ def run_evaluation_cached():
             
     return pd.DataFrame(results)
 
-# Title
-st.title("🚀 QCom Dynamic Delivery Fee Optimization Dashboard")
+st.title("QCom Dynamic Delivery Fee Optimization Dashboard")
 
-# Sidebar
 st.sidebar.header("Configuration")
 reload_data = st.sidebar.button("Reload Evaluation Data")
 
@@ -74,7 +70,6 @@ if 'eval_data' not in st.session_state or reload_data:
 
 df_res = st.session_state.eval_data
 
-# KPI Section
 st.subheader("Key Performance Indicators (Simulated Uplift)")
 col1, col2, col3, col4 = st.columns(4)
 
@@ -98,7 +93,6 @@ with col3:
 with col4:
     st.metric("Sample Size", f"{len(df_res)}")
 
-# Charts
 st.markdown("---")
 st.subheader("Analysis")
 
@@ -122,7 +116,6 @@ with c2:
     fig_scatter.update_layout(xaxis_title="Predicted Conversion Prob", yaxis_title="Expected CM2 (₹)")
     st.plotly_chart(fig_scatter, use_container_width=True)
 
-# Simulator
 st.markdown("---")
 st.subheader("Price Simulator")
 st.markdown("Test the pricing engine with custom inputs.")
@@ -158,14 +151,12 @@ with st.form("sim_form"):
         res = engine.optimize_fee(req)
         
         st.success(f"Recommended Fee: ₹{res['optimal_fee']}")
-        
-        # Breakdown
+
         metric_col1, metric_col2, metric_col3 = st.columns(3)
         metric_col1.metric("Exp. Conversion", f"{res['expected_conversion']*100:.1f}%")
         metric_col2.metric("Exp. CM2", f"₹{res['expected_cm2']:.2f}")
         metric_col3.metric("Baseline Prob", f"{res['baseline_conversion']*100:.1f}%")
-        
-        # Show candidate table
+
         if 'candidates' in res and res['candidates']:
             cand_df = pd.DataFrame(res['candidates'])
             st.dataframe(cand_df.style.highlight_max(subset=['expected_cm2'], color='lightgreen'))

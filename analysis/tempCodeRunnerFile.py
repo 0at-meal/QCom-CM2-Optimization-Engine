@@ -1,6 +1,5 @@
 import pandas as pd
 
-# Load data
 file_path = r"d:\QCom Margin Optimization Engine\data\qcom_pune_dataset.csv"
 df = pd.read_csv(file_path)
 
