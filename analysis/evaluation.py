@@ -1,19 +1,21 @@
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).resolve().parent.parent))
+
 import pandas as pd
 import numpy as np
-import sys
-import os
 
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
-from pricing import PricingEngine
-from features import load_data, preprocess_features 
+from config.settings import settings
+from src.domain.pricing_engine import PricingEngine
+from src.domain.feature_pipeline import build_features
 
 def evaluate_performance():
     print("Loading Data...")
-    df = load_data(r"d:\QCom Margin Optimization Engine\data\qcom_pune_dataset.csv")
+    df = pd.read_csv(settings.get_data_path)
 
     test_df = df.sample(1000, random_state=42)
     
-    engine = PricingEngine(model_path='models/conversion_model.pkl')
+    engine = PricingEngine()
     
     results = []
     
@@ -27,7 +29,9 @@ def evaluate_performance():
 
         actual_fee = row['delivery_fee_charged']
         
-        hist_check = engine._prepare_features(req, [actual_fee])
+        hist_df = pd.DataFrame([req])
+        hist_df['delivery_fee_charged'] = actual_fee
+        hist_check = build_features(hist_df)
         hist_prob = engine.model.predict_proba(hist_check)[:, 1][0]
         
         margin = row['basket_margin']
@@ -70,4 +74,3 @@ def evaluate_performance():
 
 if __name__ == "__main__":
     evaluate_performance()
-

@@ -1,8 +1,13 @@
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).resolve().parent.parent))
+
 import pandas as pd
 import numpy as np
 import os
+from config.settings import settings
 
-file_path = r"d:\QCom Margin Optimization Engine\data\qcom_pune_dataset.csv"
+file_path = settings.get_data_path
 df = pd.read_csv(file_path)
 
 print("Dataset Shape:", df.shape)

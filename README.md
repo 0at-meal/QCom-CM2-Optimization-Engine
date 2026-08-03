@@ -52,10 +52,96 @@ This engine uses **dynamic pricing using machine learning** to find the optimal 
 - Fee distribution analysis by traffic/basket segment
 - Built with Streamlit
 
-### Production-Ready API
-- FastAPI-based REST endpoint for real-time optimization
-- Batch processing support
-- Constraint enforcement (no sub-cost pricing, fee bounds)
+### Production Architecture & Setup
+
+The optimizer solves a constrained CM2 maximization problem:
+
+$$\max_{\text{fee}} \mathbb{E}[\text{CM2} \mid \text{fee}] \quad \text{subject to} \quad P(\text{convert} \mid \text{fee}) \ge P(\text{convert} \mid \text{fee}=0) - 0.03$$
 
 ---
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                   CLIENT (curl / OMS)                   │
+└─────────────────────────┬───────────────────────────────┘
+                          │ POST /v1/optimize
+                          │ POST /v1/optimize/batch
+                          │ GET  /health
+                          ▼
+┌─────────────────────────────────────────────────────────┐
+│                  FASTAPI SERVICE                        │
+│                                                         │
+│  PricingRequest (Pydantic v2)                           │
+│       → Validation → PricingEngine                      │
+│                           │                             │
+│             ┌─────────────▼────────────┐                │
+│             │   feature_pipeline.py    │  ← Single src  │
+│             │   (train + serve same)   │                 │
+│             └─────────────┬────────────┘                │
+│                           │                             │
+│             ┌─────────────▼────────────┐                │
+│             │   XGBoost Inference      │                 │
+│             │   Argmax CM2 subject to  │                 │
+│             │   Δconversion ≤ 3%       │                 │
+│             └─────────────┬────────────┘                │
+│                           │                             │
+│             ┌─────────────▼────────────┐                │
+│             │   PricingResponse        │                 │
+│             │   (Pydantic v2)          │                 │
+│             └──────────────────────────┘                │
+└─────────────────────────────────────────────────────────┘
+                          │
+          ┌───────────────┴──────────────┐
+          ▼                              ▼
+┌──────────────────┐          ┌──────────────────────┐
+│  MLflow Tracking │          │  GitHub Actions CI   │
+│                  │          │                      │
+│  - Params        │          │  lint & type check   │
+│  - AUC / Loss    │          │  pytest (15 tests)   │
+│  - Model artifact│          │  docker build        │
+│  - Run history   │          │                      │
+└──────────────────┘          └──────────────────────┘
+```
+
+---
+
+## Quickstart
+
+### 1. Local Development
+```bash
+# Install package in editable mode with dev dependencies
+pip install -e ".[dev]"
+
+# Run tests (15 unit + integration tests)
+pytest tests/ -v
+
+# Train MLflow-tracked model
+python src/train.py
+
+# Start API server
+uvicorn src.api.main:app --reload
+```
+Visit Swagger UI at `http://127.0.0.1:8000/docs`.
+
+### 2. Docker Setup
+Run the entire production stack (API + MLflow Tracking Server) with Docker Compose:
+```bash
+docker compose up --build
+```
+- **API Endpoint & Swagger UI**: `http://127.0.0.1:8000/docs`
+- **MLflow Tracking UI**: `http://127.0.0.1:5000`
+
+---
+
+## 💡 Synthetic Data & Production Considerations
+
+> [!NOTE]
+> **Data Note**: Quick-commerce order and pricing logs are proprietary IP. This project utilizes a synthetically generated dataset modeled after real-world Pune quick-commerce logistics heuristics (incorporating distance decay, peak-hour traffic multipliers, and price elasticity curves).
+
+### Production Realities & Next Steps:
+1. **Unobserved Confounders**: Synthetic data assumes known elasticity. In production, unobserved variables (e.g. sudden weather changes, hyper-local competitor discounts) affect conversion.
+2. **Logging Policy Bias & Off-Policy Evaluation (OPE)**: Production deployment requires correcting for historical logging policy bias using techniques like **Inverse Propensity Scoring (IPS)** or **Doubly Robust Estimation** before rolling out new pricing policies.
+
 

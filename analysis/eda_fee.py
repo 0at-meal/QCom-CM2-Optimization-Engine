@@ -1,6 +1,11 @@
-import pandas as pd
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).resolve().parent.parent))
 
-file_path = r"d:\QCom Margin Optimization Engine\data\qcom_pune_dataset.csv"
+import pandas as pd
+from config.settings import settings
+
+file_path = settings.get_data_path
 df = pd.read_csv(file_path)
 
 print("Delivery Fee Stats:\n", df['delivery_fee_charged'].describe())

@@ -1,28 +1,26 @@
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).resolve().parent.parent))
+
 import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
-import sys
-import os
 
-current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.join(current_dir, '..')
-sys.path.append(parent_dir)
-
-from src.pricing import PricingEngine
-from src.features import load_data
+from config.settings import settings
+from src.domain.pricing_engine import PricingEngine
+from src.domain.feature_pipeline import build_features
 
 st.set_page_config(page_title="QCom Pricing Optimization", layout="wide")
 
 @st.cache_resource
 def load_engine():
-    model_path = os.path.join(parent_dir, 'models', 'conversion_model.pkl')
-    return PricingEngine(model_path=model_path)
+    return PricingEngine()
 
 @st.cache_data
 def run_evaluation_cached():
-    df = load_data(os.path.join(parent_dir, 'data', 'qcom_pune_dataset.csv'))
+    df = pd.read_csv(settings.get_data_path)
 
     test_df = df.sample(500, random_state=42)
     engine = load_engine()
@@ -35,7 +33,11 @@ def run_evaluation_cached():
             opt = engine.optimize_fee(req)
             
             actual_fee = row['delivery_fee_charged']
-            hist_features = engine._prepare_features(req, [actual_fee])
+            
+            # recreate historical features to get historic prob
+            hist_df = pd.DataFrame([req])
+            hist_df['delivery_fee_charged'] = actual_fee
+            hist_features = build_features(hist_df)
             hist_prob = engine.model.predict_proba(hist_features)[:, 1][0]
             
             margin = row['basket_margin']
